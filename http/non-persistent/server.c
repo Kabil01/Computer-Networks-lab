@@ -1,7 +1,3 @@
-//http
-//non - persistent
-//server.c
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +6,32 @@
 #include <sys/socket.h>
 
 #define PORT 8080
+#define OBJECT_FILE "object.txt"
+
+void send_all_objects(int sockfd) {
+    printf("Sending All Objects\n");
+
+    // Open the object file
+    FILE* object_file = fopen(OBJECT_FILE, "r");
+    if (object_file == NULL) {
+        perror("Failed to open object file");
+        exit(EXIT_FAILURE);
+    }
+
+    char line[256];
+    char response[4096];
+
+    // Read and send each line from the object file
+    while (fgets(line, sizeof(line), object_file) != NULL) {
+        strcat(response, line);
+    }
+
+    // Send the concatenated response containing all objects
+    send(sockfd, response, strlen(response), 0);
+
+    // Close the object file
+    fclose(object_file);
+}
 
 int main() {
     int server_fd, new_socket;
@@ -56,23 +78,14 @@ int main() {
 
         printf("Connection accepted from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-        // Process the HTTP request and send a response
-        char request_buffer[4096];
-        ssize_t bytes_received = recv(new_socket, request_buffer, sizeof(request_buffer), 0);
+        // Send all objects as a single response
+        send_all_objects(new_socket);
 
-        if (bytes_received > 0) {
-            request_buffer[bytes_received] = '\0';
-            printf("Received request:\n%s\n", request_buffer);
-
-            // Send an HTTP response
-            char response[] = "HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!";
-            send(new_socket, response, strlen(response), 0);
-        }
-
-        // Close the connection after sending the response
+        // Close the connection
         close(new_socket);
         printf("Connection closed with %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
     }
 
     return 0;
 }
+
