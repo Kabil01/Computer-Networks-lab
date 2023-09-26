@@ -8,19 +8,36 @@
 #define SERVER_IP "127.0.0.1"
 #define PORT 8080
 
-void receive_all_objects(int sockfd) {
-    printf("\nReceiving All Objects\n");
+void send_http_request(int sockfd, const struct sockaddr_in* server_addr, const char* object_name) {
+    char request[256];
+    snprintf(request, sizeof(request), "GET /%s HTTP/1.1\r\nHost: %s\r\n\r\n", object_name, SERVER_IP);
+
+    printf("\nOpening Connection for %s\n", object_name);
+
+    // Connect to the server
+    if (connect(sockfd, (struct sockaddr*)server_addr, sizeof(*server_addr)) < 0) {
+        perror("Connection failed");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("\nTCP Connection for %s is Open\n", object_name);
+
+    // Send the HTTP request
+    send(sockfd, request, strlen(request), 0);
 
     char response[4096];
     ssize_t bytes_received;
 
-    // Receive and print all objects from the server
+    // Receive and print the server's response for each object
     while ((bytes_received = recv(sockfd, response, sizeof(response) - 1, 0)) > 0) {
         response[bytes_received] = '\0';
-        printf("\nReceived Objects:\n%s\n", response);
+        printf("\nReceived Response for %s\n\n", object_name);
     }
 
-    printf("All Objects Received\n");
+    // Close the connection for this object
+    close(sockfd);
+
+    printf("TCP Connection for %s is close\n", object_name);
 }
 
 int main() {
@@ -51,17 +68,34 @@ int main() {
     char response[64];
     ssize_t bytes_received;
 
-    // Receive the concatenated response containing all objects from the server
+    // Receive the number of objects from the server
     bytes_received = recv(sockfd, response, sizeof(response) - 1, 0);
 
     if (bytes_received > 0) {
         response[bytes_received] = '\0';
+        int num_objects = atoi(response);
         printf("\nTCP Connection open");
-        printf("\nReceived All Objects\n");
+        printf("\nReceived number of objects: %d\n", num_objects);
+            printf("\nBase file received\n");
         printf("\nTCP Connection close");
 
-        // Close the connection
+        // Close the initial connection
         close(sockfd);
+
+        // Loop to establish connections for each object
+        for (int i = 1; i <= num_objects; i++) {
+            // Create a new socket for each object
+            int object_sockfd;
+            if ((object_sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+                perror("Socket creation failed");
+                exit(EXIT_FAILURE);
+            }
+
+            char object_name[64];
+            snprintf(object_name, sizeof(object_name), "object%d", i);
+
+            send_http_request(object_sockfd, &server_addr, object_name);
+        }
     }
 
     return 0;

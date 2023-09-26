@@ -8,31 +8,6 @@
 #define PORT 8080
 #define OBJECT_FILE "object.txt"
 
-void send_all_objects(int sockfd) {
-    printf("Sending All Objects\n");
-
-    // Open the object file
-    FILE* object_file = fopen(OBJECT_FILE, "r");
-    if (object_file == NULL) {
-        perror("Failed to open object file");
-        exit(EXIT_FAILURE);
-    }
-
-    char line[256];
-    char response[4096];
-
-    // Read and send each line from the object file
-    while (fgets(line, sizeof(line), object_file) != NULL) {
-        strcat(response, line);
-    }
-
-    // Send the concatenated response containing all objects
-    send(sockfd, response, strlen(response), 0);
-
-    // Close the object file
-    fclose(object_file);
-}
-
 int main() {
     int server_fd, new_socket;
     struct sockaddr_in server_addr, client_addr;
@@ -69,6 +44,22 @@ int main() {
 
     printf("Server listening on port %d...\n", PORT);
 
+    // Open the base file (object.txt) and count the number of lines (objects)
+    FILE* base_file = fopen("object.txt", "r");
+    if (base_file == NULL) {
+        perror("Failed to open base file");
+        exit(EXIT_FAILURE);
+    }
+
+    char line[256];
+    int num_objects = 0;
+    while (fgets(line, sizeof(line), base_file) != NULL) {
+        num_objects++;
+    }
+    fclose(base_file);
+
+    printf("Number of objects: %d\n", num_objects);
+
     while (1) {
         // Accept a new connection
         if ((new_socket = accept(server_fd, (struct sockaddr*)&client_addr, (socklen_t*)&addrlen)) < 0) {
@@ -78,8 +69,12 @@ int main() {
 
         printf("Connection accepted from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-        // Send all objects as a single response
-        send_all_objects(new_socket);
+        // Convert the number of objects to a string
+        char num_objects_str[64];
+        snprintf(num_objects_str, sizeof(num_objects_str), "%d", num_objects);
+
+        // Send the number of objects as a response
+        send(new_socket, num_objects_str, strlen(num_objects_str), 0);
 
         // Close the connection
         close(new_socket);
